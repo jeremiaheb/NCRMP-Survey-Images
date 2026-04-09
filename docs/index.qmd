@@ -1,0 +1,158 @@
+---
+title: "NCRMP Survey Map"
+format: 
+  html:
+    self-contained: true
+    page-layout: full
+execute:
+  echo: false
+  message: false
+  warning: false
+---
+
+```{r setup, include=FALSE}
+library(leaflet)
+library(readr)
+library(dplyr)
+library(crosstalk)
+library(htmlwidgets)
+```
+::: {.column-screen style="padding: 0 20px;"}
+```{r}
+# 2. Data Loading
+data_path <- "../data/survey_data.csv"
+
+if (!file.exists(data_path)) {
+  stop(paste("File not found at:", data_path, "\nPlease check your directory path."))
+}
+
+# Load the CSV
+data <- read_csv(data_path)
+
+# =========================================================================
+# 2.b Dynamic Image URL Construction (For GCloud / Standard Web Hosting)
+# =========================================================================
+# Toggle this to TRUE when you move to Google Cloud Storage. 
+# While FALSE, the map will continue to use the Img1-Img4 columns in your CSV (for your GDrive test).
+use_gcloud_paths <- TRUE
+
+if (use_gcloud_paths) {
+  # Replace with your actual public Google Cloud Storage bucket URL
+  gcs_bucket_url <- "https://storage.googleapis.com/ncrmp-photos-test"
+  
+  data <- data %>%
+    mutate(
+      # 1. Map Region to shortened abbreviation for directory paths
+      CleanRegion = case_when(
+        Region == "St. Thomas/John" ~ "STTSTJ",
+        Region == "St. Croix" ~ "STX",
+        Region == "Puerto Rico" ~ "PRICO",
+        TRUE ~ gsub("/", "_", Region) # Fallback just in case there are others
+      ),
+      
+      # 2. Build predictable paths: Bucket / Year / Region / SurveyID / 1.jpg
+      # If a site only has 2 images, 3.jpg will 404, but our HTML 'onerror' tag will hide it cleanly!
+      Img1 = paste0(gcs_bucket_url, "/", Year, "/", CleanRegion, "/", SurveyID, "/1.jpg"),
+      Img2 = paste0(gcs_bucket_url, "/", Year, "/", CleanRegion, "/", SurveyID, "/2.jpg"),
+      Img3 = paste0(gcs_bucket_url, "/", Year, "/", CleanRegion, "/", SurveyID, "/3.jpg"),
+      Img4 = paste0(gcs_bucket_url, "/", Year, "/", CleanRegion, "/", SurveyID, "/4.jpg")
+    )
+} else {
+  # Failsafe: Ensure image columns exist for the GDrive PoC if missing
+  for (col in c("Img1", "Img2", "Img3", "Img4")) {
+    if (!col %in% names(data)) {
+      data[[col]] <- NA
+    }
+  }
+}
+# =========================================================================
+
+
+# 3. Create Shared Data Object (Crosstalk)
+shared_data <- SharedData$new(data)
+
+# 4. Create the Map
+map <- leaflet(shared_data, width = "100%", height = "60vh") %>%
+  addTiles(group = "Street Map") %>%
+  addProviderTiles(providers$Esri.WorldImagery, group = "Satellite") %>%
+  addCircleMarkers(
+    lng = ~Lon, 
+    lat = ~Lat,
+    radius = 5,                 
+    color = "#0073FF",          
+    stroke = FALSE,             
+    fillOpacity = 0.7,          
+    popup = ~paste0(
+      "<div style='font-family: sans-serif; min-width: 200px;'>",
+      "<b>Survey ID:</b> ", SurveyID, "<br>",
+      "<b>Region:</b> ", Region, "<br>",
+      "<b>Year:</b> ", Year,
+      "</div>",
+      
+      # Hide the images within the popup so our Javascript listener can grab them 
+      "<div class='hidden-images' style='display: none;'>",
+      "<div style='display: flex; gap: 15px; width: 100%; justify-content: space-between;'>",
+      
+      # We added 'flex: 1' to the <a> tags to make them stretch equally, 
+      # and 'height: 250px' to the images to prevent them from collapsing.
+      ifelse(!is.na(Img1), paste0("<a href='", Img1, "' target='_blank' style='flex: 1; min-width: 0;'><img src='", Img1, "' style='width: 100%; height: 250px; object-fit: cover; border-radius: 6px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border: 1px solid #dee2e6;' onerror=\"this.style.display='none';\" /></a>"), ""),
+      ifelse(!is.na(Img2), paste0("<a href='", Img2, "' target='_blank' style='flex: 1; min-width: 0;'><img src='", Img2, "' style='width: 100%; height: 250px; object-fit: cover; border-radius: 6px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border: 1px solid #dee2e6;' onerror=\"this.style.display='none';\" /></a>"), ""),
+      ifelse(!is.na(Img3), paste0("<a href='", Img3, "' target='_blank' style='flex: 1; min-width: 0;'><img src='", Img3, "' style='width: 100%; height: 250px; object-fit: cover; border-radius: 6px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border: 1px solid #dee2e6;' onerror=\"this.style.display='none';\" /></a>"), ""),
+      ifelse(!is.na(Img4), paste0("<a href='", Img4, "' target='_blank' style='flex: 1; min-width: 0;'><img src='", Img4, "' style='width: 100%; height: 250px; object-fit: cover; border-radius: 6px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border: 1px solid #dee2e6;' onerror=\"this.style.display='none';\" /></a>"), ""),
+      
+      "</div></div>"
+    ),
+    group = "Surveys"
+  ) %>%
+  addLayersControl(
+    baseGroups = c("Street Map", "Satellite"),
+    overlayGroups = c("Surveys"),
+    options = layersControlOptions(collapsed = FALSE)
+  ) %>%
+  addScaleBar(position = "bottomleft") %>%
+  onRender("
+    function(el, x) {
+      this.on('popupopen', function(e) {
+        var tempDiv = document.createElement('div');
+        tempDiv.innerHTML = e.popup.getContent();
+        var hiddenImages = tempDiv.querySelector('.hidden-images');
+        var panel = document.getElementById('photo-panel');
+        if (hiddenImages && panel) {
+          panel.innerHTML = hiddenImages.innerHTML;
+          // Change the background style of the panel once photos are loaded
+          panel.style.border = 'none';
+          panel.style.background = 'transparent';
+          panel.style.padding = '0'; // Remove padding so images stretch edge-to-edge
+        }
+      });
+    }
+  ")
+
+# 5. Assemble the Dashboard with Filters
+# We move the photo panel inside the R chunk and group it with the map using tagList
+photo_panel <- htmltools::HTML('
+  <div id="photo-panel" style="margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 8px; min-height: 250px; display: flex; align-items: center; justify-content: center; color: #6c757d; font-family: sans-serif; border: 2px dashed #ccc; width: 100%; box-sizing: border-box;">
+    <h3 style="margin: 0;">Select a survey point on the map to view photos</h3>
+  </div>
+')
+
+dashboard <- bscols(
+  widths = c(2, 10), 
+  list(
+    filter_select(id = "region_filter", label = "Select Region:", sharedData = shared_data, group = ~Region),
+    filter_checkbox(id = "year_filter", label = "Select Year(s):", sharedData = shared_data, group = ~Year, inline = FALSE)
+  ),
+  htmltools::tagList(
+    map,
+    photo_panel
+  )
+)
+
+# 6. Display the Dashboard
+dashboard
+```
+:::
+
+
+
+

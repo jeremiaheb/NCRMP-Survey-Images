@@ -17,6 +17,7 @@ library(dplyr)
 library(crosstalk)
 library(htmlwidgets)
 ```
+
 ::: {.column-screen style="padding: 0 20px;"}
 ```{r}
 # 2. Data Loading
@@ -29,15 +30,21 @@ if (!file.exists(data_path)) {
 # Load the CSV
 data <- read_csv(data_path)
 
+# Failsafe: If the CSV doesn't have a 'Has_Photos' column yet, add it temporarily.
+if (!"Has_Photos" %in% names(data)) {
+  # For now, default everything to "Yes" to prevent the filter from breaking.
+  # (See instructions below on how to update your CSV with the real data!)
+  data$Has_Photos <- "Yes" 
+}
+
 # =========================================================================
-# 2.b Dynamic Image URL Construction (For GCloud / Standard Web Hosting)
+# 2.b Dynamic Image URL Construction (For GCloud)
 # =========================================================================
-# Toggle this to TRUE when you move to Google Cloud Storage. 
-# While FALSE, the map will continue to use the Img1-Img4 columns in your CSV (for your GDrive test).
+# Toggle set to TRUE to use your new GCloud bucket!
 use_gcloud_paths <- TRUE
 
 if (use_gcloud_paths) {
-  # Replace with your actual public Google Cloud Storage bucket URL
+  # Your new public Google Cloud Storage bucket URL
   gcs_bucket_url <- "https://storage.googleapis.com/ncrmp-photos-test"
   
   data <- data %>%
@@ -51,7 +58,6 @@ if (use_gcloud_paths) {
       ),
       
       # 2. Build predictable paths: Bucket / Year / Region / SurveyID / 1.jpg
-      # If a site only has 2 images, 3.jpg will 404, but our HTML 'onerror' tag will hide it cleanly!
       Img1 = paste0(gcs_bucket_url, "/", Year, "/", CleanRegion, "/", SurveyID, "/1.jpg"),
       Img2 = paste0(gcs_bucket_url, "/", Year, "/", CleanRegion, "/", SurveyID, "/2.jpg"),
       Img3 = paste0(gcs_bucket_url, "/", Year, "/", CleanRegion, "/", SurveyID, "/3.jpg"),
@@ -73,7 +79,7 @@ shared_data <- SharedData$new(data)
 
 # 4. Create the Map
 map <- leaflet(shared_data, width = "100%", height = "60vh") %>%
-  addTiles(group = "Street Map") %>%
+  addProviderTiles(providers$Esri.OceanBasemap, group = "Ocean Basemap") %>%
   addProviderTiles(providers$Esri.WorldImagery, group = "Satellite") %>%
   addCircleMarkers(
     lng = ~Lon, 
@@ -83,29 +89,53 @@ map <- leaflet(shared_data, width = "100%", height = "60vh") %>%
     stroke = FALSE,             
     fillOpacity = 0.7,          
     popup = ~paste0(
-      "<div style='font-family: sans-serif; min-width: 200px;'>",
-      "<b>Survey ID:</b> ", SurveyID, "<br>",
-      "<b>Region:</b> ", Region, "<br>",
-      "<b>Year:</b> ", Year,
+      # Elegant modern popup container
+      "<div style='font-family: \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif; min-width: 220px; padding: 2px;'>",
+      
+      # Distinct Header with a bottom border matching the marker color
+      "<h4 style='margin-top: 0; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid #0073FF; color: #2c3e50; font-size: 16px; font-weight: 700;'>",
+      "Survey ID: ", SurveyID, 
+      "</h4>",
+      
+      # Flexbox rows for perfectly aligned label-value pairs
+      "<div style='display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 14px;'>",
+      "<span style='color: #6c757d; font-weight: 500;'>Region:</span>",
+      "<span style='color: #212529; font-weight: 600; text-align: right;'>", Region, "</span>",
+      "</div>",
+      
+      "<div style='display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 14px;'>",
+      "<span style='color: #6c757d; font-weight: 500;'>Year:</span>",
+      "<span style='color: #212529; font-weight: 600; text-align: right;'>", Year, "</span>",
+      "</div>",
+      
+      "<div style='display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 14px;'>",
+      "<span style='color: #6c757d; font-weight: 500;'>Depth:</span>",
+      "<span style='color: #212529; font-weight: 600; text-align: right;'>", Depth, " ft</span>",
+      "</div>",
+      
+      "<div style='display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 14px;'>",
+      "<span style='color: #6c757d; font-weight: 500;'>Habitat:</span>",
+      "<span style='color: #212529; font-weight: 600; text-align: right;'>", Habitat, "</span>",
+      "</div>",
+      
       "</div>",
       
       # Hide the images within the popup so our Javascript listener can grab them 
       "<div class='hidden-images' style='display: none;'>",
       "<div style='display: flex; gap: 15px; width: 100%; justify-content: space-between;'>",
       
-      # We added 'flex: 1' to the <a> tags to make them stretch equally, 
-      # and 'height: 250px' to the images to prevent them from collapsing.
-      ifelse(!is.na(Img1), paste0("<a href='", Img1, "' target='_blank' style='flex: 1; min-width: 0;'><img src='", Img1, "' style='width: 100%; height: 250px; object-fit: cover; border-radius: 6px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border: 1px solid #dee2e6;' onerror=\"this.style.display='none';\" /></a>"), ""),
-      ifelse(!is.na(Img2), paste0("<a href='", Img2, "' target='_blank' style='flex: 1; min-width: 0;'><img src='", Img2, "' style='width: 100%; height: 250px; object-fit: cover; border-radius: 6px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border: 1px solid #dee2e6;' onerror=\"this.style.display='none';\" /></a>"), ""),
-      ifelse(!is.na(Img3), paste0("<a href='", Img3, "' target='_blank' style='flex: 1; min-width: 0;'><img src='", Img3, "' style='width: 100%; height: 250px; object-fit: cover; border-radius: 6px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border: 1px solid #dee2e6;' onerror=\"this.style.display='none';\" /></a>"), ""),
-      ifelse(!is.na(Img4), paste0("<a href='", Img4, "' target='_blank' style='flex: 1; min-width: 0;'><img src='", Img4, "' style='width: 100%; height: 250px; object-fit: cover; border-radius: 6px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border: 1px solid #dee2e6;' onerror=\"this.style.display='none';\" /></a>"), ""),
+      # We changed target='_blank' to an onclick function that triggers our new modal window
+      ifelse(!is.na(Img1), paste0("<a href='#' onclick='openImageModal(this); return false;' style='flex: 1; min-width: 0;'><img src='", Img1, "' style='width: 100%; height: 250px; object-fit: cover; border-radius: 6px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border: 1px solid #dee2e6;' onerror=\"this.style.display='none';\" /></a>"), ""),
+      ifelse(!is.na(Img2), paste0("<a href='#' onclick='openImageModal(this); return false;' style='flex: 1; min-width: 0;'><img src='", Img2, "' style='width: 100%; height: 250px; object-fit: cover; border-radius: 6px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border: 1px solid #dee2e6;' onerror=\"this.style.display='none';\" /></a>"), ""),
+      ifelse(!is.na(Img3), paste0("<a href='#' onclick='openImageModal(this); return false;' style='flex: 1; min-width: 0;'><img src='", Img3, "' style='width: 100%; height: 250px; object-fit: cover; border-radius: 6px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border: 1px solid #dee2e6;' onerror=\"this.style.display='none';\" /></a>"), ""),
+      ifelse(!is.na(Img4), paste0("<a href='#' onclick='openImageModal(this); return false;' style='flex: 1; min-width: 0;'><img src='", Img4, "' style='width: 100%; height: 250px; object-fit: cover; border-radius: 6px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border: 1px solid #dee2e6;' onerror=\"this.style.display='none';\" /></a>"), ""),
       
       "</div></div>"
     ),
     group = "Surveys"
   ) %>%
   addLayersControl(
-    baseGroups = c("Street Map", "Satellite"),
+    baseGroups = c("Ocean Basemap", "Satellite"),
     overlayGroups = c("Surveys"),
     options = layersControlOptions(collapsed = FALSE)
   ) %>%
@@ -134,13 +164,61 @@ photo_panel <- htmltools::HTML('
   <div id="photo-panel" style="margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 8px; min-height: 250px; display: flex; align-items: center; justify-content: center; color: #6c757d; font-family: sans-serif; border: 2px dashed #ccc; width: 100%; box-sizing: border-box;">
     <h3 style="margin: 0;">Select a survey point on the map to view photos</h3>
   </div>
+  
+  <!-- Custom Modal Overlay for viewing all 4 photos -->
+  <div id="image-modal" style="display: none; position: fixed; z-index: 9999; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.9);">
+    <span onclick="document.getElementById(\'image-modal\').style.display=\'none\'" style="position: fixed; top: 20px; right: 40px; color: #f1f1f1; font-size: 40px; font-weight: bold; cursor: pointer; z-index: 10000;">&times;</span>
+    <div id="modal-content" style="margin: auto; display: flex; flex-direction: column; align-items: center; width: 90%; max-width: 800px; padding: 60px 0; gap: 30px;">
+      <!-- JavaScript will dynamically inject the active site images here -->
+    </div>
+  </div>
+  
+  <script>
+  // Function to open the modal and populate it with images from the clicked container
+  function openImageModal(anchorElement) {
+    var modal = document.getElementById("image-modal");
+    var modalContent = document.getElementById("modal-content");
+    modalContent.innerHTML = ""; // Clear out previous images
+    
+    // Look up to the container to grab all 4 images for this site
+    var container = anchorElement.parentNode;
+    var images = container.querySelectorAll("img");
+    
+    images.forEach(function(img) {
+      // Only pull images that haven\'t been hidden by our 404 failsafe
+      if (img.style.display !== "none" && img.src !== "") {
+        var newImg = document.createElement("img");
+        newImg.src = img.src;
+        newImg.style.width = "100%";
+        newImg.style.height = "auto";
+        newImg.style.borderRadius = "8px";
+        newImg.style.boxShadow = "0 8px 16px rgba(0,0,0,0.6)";
+        modalContent.appendChild(newImg);
+      }
+    });
+    
+    // Show the modal
+    modal.style.display = "block";
+  }
+  
+  // Close the modal when the user clicks anywhere on the dark background
+  window.onclick = function(event) {
+    var modal = document.getElementById("image-modal");
+    if (event.target === modal) {
+      modal.style.display = "none";
+    }
+  }
+  </script>
 ')
 
 dashboard <- bscols(
   widths = c(2, 10), 
   list(
     filter_select(id = "region_filter", label = "Select Region:", sharedData = shared_data, group = ~Region),
-    filter_checkbox(id = "year_filter", label = "Select Year(s):", sharedData = shared_data, group = ~Year, inline = FALSE)
+    filter_checkbox(id = "year_filter", label = "Select Year(s):", sharedData = shared_data, group = ~Year, inline = FALSE),
+    filter_select(id = "habitat_filter", label = "Select Habitat:", sharedData = shared_data, group = ~Habitat),
+    filter_slider(id = "depth_filter", label = "Depth Range (ft):", sharedData = shared_data, column = ~Depth),
+    filter_checkbox(id = "photos_filter", label = "Has Photos:", sharedData = shared_data, group = ~Has_Photos, inline = TRUE)
   ),
   htmltools::tagList(
     map,
@@ -152,7 +230,3 @@ dashboard <- bscols(
 dashboard
 ```
 :::
-
-
-
-

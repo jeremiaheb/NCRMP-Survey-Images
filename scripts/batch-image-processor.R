@@ -58,15 +58,32 @@ for (dir in target_dirs) {
   # Grab all image files inside the current folder
   imgs <- list.files(dir, pattern = "\\.(jpg|jpeg|png)$", ignore.case = TRUE, full.names = TRUE)
 
-  # We only want to process a maximum of 4 images per site
-  imgs_to_process <- head(imgs, 4)
+  if (length(imgs) == 0) {
+    cat("Skipping Site:", site_id, "- No images found\n")
+    next
+  }
 
-  cat("Processing Site:", site_id, "- Found", length(imgs_to_process), "images\n")
+  # --- NEW SORTING LOGIC ---
+  # Extract the rank from the filename (e.g., "1_4125.JPG" -> 1)
+  base_names <- basename(imgs)
+  ranks <- as.numeric(sub("^([0-9]+)_.*", "\\1", base_names))
 
-  # Loop through the 1 to 4 images
+  # Sort the image paths numerically by their extracted rank
+  sorted_imgs <- imgs[order(ranks)]
+
+  # Grab up to the top 4 images (handles cases where there are fewer than 4)
+  imgs_to_process <- head(sorted_imgs, 4)
+  # -------------------------
+
+  cat("Processing Site:", site_id, "- Formatting top", length(imgs_to_process), "images\n")
+
+  # Loop through the selected images
   for (i in seq_along(imgs_to_process)) {
 
     img_path <- imgs_to_process[i]
+
+    # Identify the actual rank of the current image to ensure correct naming
+    current_rank <- ranks[order(ranks)][i]
 
     # Read the image using magick
     img <- image_read(img_path)
@@ -74,8 +91,8 @@ for (dir in target_dirs) {
     # Resize the image so the width is exactly 800px (keeps aspect ratio)
     img_resized <- image_scale(img, "800")
 
-    # Define the new filename (e.g., "1.jpg", "2.jpg")
-    out_path <- file.path(target_site_dir, paste0(i, ".jpg"))
+    # Define the new filename using its actual AI rank (e.g., "1.jpg", "2.jpg")
+    out_path <- file.path(target_site_dir, paste0(current_rank, ".jpg"))
 
     # Write the image as a compressed JPEG (Quality 80 is perfect for web)
     image_write(img_resized, path = out_path, format = "jpeg", quality = 80)

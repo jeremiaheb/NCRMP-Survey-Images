@@ -45,7 +45,7 @@ use_gcloud_paths <- TRUE
 
 if (use_gcloud_paths) {
   # Your new public Google Cloud Storage bucket URL
-  gcs_bucket_url <- "https://storage.googleapis.com/ncrmp-photos-test"
+  gcs_bucket_url <- "https://storage.googleapis.com/ncrmp-atlantic-photos"
   
   data <- data %>%
     mutate(

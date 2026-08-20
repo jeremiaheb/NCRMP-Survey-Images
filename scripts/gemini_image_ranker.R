@@ -94,9 +94,21 @@ for (folder_index in seq_along(site_folders)) {
     )
   )
 
-  # Process and compress images
+  # Process and compress images (with corrupted file protection)
   for (img_path in image_files) {
-    img <- image_read(img_path)
+
+    # Safely attempt to read the image
+    img <- tryCatch({
+      image_read(img_path)
+    }, error = function(e) {
+      cat(sprintf("  [WARNING] Skipping corrupted image: %s\n", basename(img_path)))
+      return(NULL) # Return NULL if reading fails
+    })
+
+    # If the image was corrupted and returned NULL, skip to the next file
+    if (is.null(img)) next
+
+    # Process healthy images normally
     img_resized <- image_scale(img, "800x800")
     img_raw <- image_write(img_resized, format = "jpeg")
     img_b64 <- base64encode(img_raw)
@@ -113,6 +125,12 @@ for (folder_index in seq_along(site_folders)) {
         )
       )
     ))
+  }
+
+  # Failsafe: Check if ALL images in the folder were corrupted
+  if (length(parts_list) == 1) {
+    cat("  [ERROR] All images in this folder were corrupted. Skipping site.\n")
+    next
   }
 
   # 4. Prepare the Enterprise Vertex AI Request

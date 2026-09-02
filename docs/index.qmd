@@ -16,19 +16,20 @@ library(readr)
 library(dplyr)
 library(crosstalk)
 library(htmlwidgets)
+library(arrow)
 ```
 
 ::: {.column-screen style="padding: 0 20px;"}
 ```{r}
 # 2. Data Loading
-data_path <- "../data/survey_data.csv"
+data_path <- "../data/survey_data.parquet"
 
 if (!file.exists(data_path)) {
   stop(paste("File not found at:", data_path, "\nPlease check your directory path."))
 }
 
 # Load the CSV
-data <- read_csv(data_path)
+data <- read_parquet(data_path)
 
 # Failsafe: If the CSV doesn't have a 'Has_Photos' column yet, add it temporarily.
 if (!"Has_Photos" %in% names(data)) {
@@ -54,6 +55,10 @@ if (use_gcloud_paths) {
         Region == "St. Thomas/John" ~ "STTSTJ",
         Region == "St. Croix" ~ "STX",
         Region == "Puerto Rico" ~ "PRICO",
+        Region == "Dry Tortugas" ~ "DRTO",
+        Region == "Florida Keys" ~ "FKEYS",
+        Region == "Southeast Florida" ~ "SEFL",
+        Region == "Flower Garden Banks" ~ "FGB",
         TRUE ~ gsub("/", "_", Region) # Fallback just in case there are others
       ),
       
@@ -84,10 +89,10 @@ map <- leaflet(shared_data, width = "100%", height = "60vh") %>%
   addCircleMarkers(
     lng = ~Lon, 
     lat = ~Lat,
-    radius = 5,                 
+    radius = 3,                 # Smaller radius prevents severe overlapping
     color = "#0073FF",          
-    stroke = FALSE,             
-    fillOpacity = 0.7,          
+    stroke = FALSE,             # Removing the stroke keeps the edges clean
+    fillOpacity = 0.25,         # High transparency creates a heatmap effect on dense clusters
     popup = ~paste0(
       # Elegant modern popup container
       "<div style='font-family: \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif; min-width: 220px; padding: 2px;'>",
@@ -134,27 +139,51 @@ map <- leaflet(shared_data, width = "100%", height = "60vh") %>%
     ),
     group = "Surveys"
   ) %>%
-  addLayersControl(
+addLayersControl(
     baseGroups = c("Ocean Basemap", "World Topo"),
     overlayGroups = c("Surveys"),
     options = layersControlOptions(collapsed = FALSE)
   ) %>%
   addScaleBar(position = "bottomleft") %>%
-  onRender("
+onRender("
     function(el, x) {
-      this.on('popupopen', function(e) {
+      var map = this;
+      
+      // 1. Existing Popup Photo Panel Logic
+      map.on('popupopen', function(e) {
         var tempDiv = document.createElement('div');
         tempDiv.innerHTML = e.popup.getContent();
         var hiddenImages = tempDiv.querySelector('.hidden-images');
         var panel = document.getElementById('photo-panel');
         if (hiddenImages && panel) {
           panel.innerHTML = hiddenImages.innerHTML;
-          // Change the background style of the panel once photos are loaded
           panel.style.border = 'none';
           panel.style.background = 'transparent';
-          panel.style.padding = '0'; // Remove padding so images stretch edge-to-edge
+          panel.style.padding = '0'; 
         }
       });
+      
+      // 2. NEW: Dynamic Zoom Styling Logic
+      map.on('zoomend', function() {
+        var currentZoom = map.getZoom();
+        
+        // Define our thresholds: Zoom level 14 reaches max zoom level for Ocean Basemap
+        var newOpacity = currentZoom >= 14 ? 0.9 : 0.25;
+        var newRadius = currentZoom >= 14 ? 6 : 3;
+        
+        // Loop through all map layers and update the circle markers
+        map.eachLayer(function(layer) {
+          if (layer instanceof L.CircleMarker) {
+            layer.setStyle({
+              fillOpacity: newOpacity,
+              radius: newRadius
+            });
+          }
+        });
+      });
+      
+      // Trigger it once on initial load just in case the default zoom is already close
+      map.fire('zoomend');
     }
   ")
 

@@ -26,8 +26,8 @@ model_id <- "gemini-3.5-flash"
 
 # --- COST TRACKING VARIABLES ---
 # Estimated prices per 1,000,000 tokens (Update based on current Google Cloud pricing)
-price_per_1m_input <- 0.075
-price_per_1m_output <- 0.30
+price_per_1m_input <- 1.50
+price_per_1m_output <- 9.00
 
 total_batch_input_tokens <- 0
 total_batch_output_tokens <- 0
@@ -83,12 +83,13 @@ for (folder_index in seq_along(site_folders)) {
   # Start building the parts list
   parts_list <- list(
     list(
-      text = "You are an expert marine biologist assistant. I am providing you with a batch of photos from a single coral reef survey site. Your task is to rank ALL of the provided photos from best to worst based on how well they represent the reef landscape.
+      text = "You are an expert marine biologist assistant. I am providing you with a batch of photos from a single coral reef survey site. Your task is to rank ALL of the provided photos from best to worst based on how well they represent the overall reef landscape.
 
       CRITERIA FOR RANKING:
-      1. Higher Rank: Clear and sharp visibility of the reef, showing the general landscape/benthic habitat (complex branching corals are a plus).
-      2. Lower Rank: Blurry, poor lighting, or obscured views.
-      3. Lowest Rank (Penalize): Any photos showing clipboards, datasheets MUST be ranked at the very bottom of the list.
+      1. Highest Rank (Ideal): Wide-angle, 'eye-level' or landscape-style perspectives showing general habitat structure, vertical relief, and broader reef context (complex branching corals are a plus). Note: The presence of transect tapes or PVC quadrats on the reef is perfectly acceptable and should not be penalized.
+      2. Medium Rank: Photos taken looking straight down at the seafloor (aerial/nadir/quadrat views) OR extreme close-up/macro photos of individual corals/fish where the overall habitat context is lost.
+      3. Lower Rank: Blurry images, photos with poor lighting, severe backscatter, OR photos where human divers are prominently obstructing the view of the reef.
+      4. Lowest Rank (Penalize Heavily): Any photos showing clipboards, datasheets, or boats MUST be ranked at the very bottom of the list.
 
       Please return ONLY a JSON array containing the exact filenames of ALL the photos, ordered from best (first) to worst (last). For example: [\"best_photo.jpg\", \"second_best.jpg\", ..., \"worst_photo_with_clipboard.jpg\"]"
     )

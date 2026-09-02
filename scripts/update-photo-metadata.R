@@ -10,6 +10,7 @@ library(rstudioapi)
 library(httr2)
 library(gargle)
 library(jsonlite)
+library(arrow)
 
 # --- HARDCODED VARIABLES ---
 gcs_bucket_url <- "https://storage.googleapis.com/ncrmp-atlantic-photos"
@@ -92,6 +93,10 @@ data <- data %>%
       Region == "St. Thomas/John" ~ "STTSTJ",
       Region == "St. Croix" ~ "STX",
       Region == "Puerto Rico" ~ "PRICO",
+      Region == "Dry Tortugas" ~ "DRTO",
+      Region == "Florida Keys" ~ "FKEYS",
+      Region == "Southeast Florida" ~ "SEFL",
+      Region == "Flower Garden Banks" ~ "FGB",
       TRUE ~ gsub("/", "_", Region)
     ),
 

@@ -80,7 +80,7 @@ shared_data <- SharedData$new(data)
 # 4. Create the Map
 map <- leaflet(shared_data, width = "100%", height = "60vh") %>%
   addProviderTiles(providers$Esri.OceanBasemap, group = "Ocean Basemap") %>%
-  addProviderTiles(providers$Esri.WorldImagery, group = "Satellite") %>%
+  addProviderTiles(providers$Esri.WorldTopoMap, group = "World Topo") %>%
   addCircleMarkers(
     lng = ~Lon, 
     lat = ~Lat,
@@ -135,7 +135,7 @@ map <- leaflet(shared_data, width = "100%", height = "60vh") %>%
     group = "Surveys"
   ) %>%
   addLayersControl(
-    baseGroups = c("Ocean Basemap", "Satellite"),
+    baseGroups = c("Ocean Basemap", "World Topo"),
     overlayGroups = c("Surveys"),
     options = layersControlOptions(collapsed = FALSE)
   ) %>%

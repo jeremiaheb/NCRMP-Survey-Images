@@ -50,6 +50,7 @@ if (use_gcloud_paths) {
   
   data <- data %>%
     mutate(
+      Search_Key = paste(Year,"-",SurveyID),
       # 1. Map Region to shortened abbreviation for directory paths
       CleanRegion = case_when(
         Region == "St. Thomas/John" ~ "STTSTJ",
@@ -243,6 +244,7 @@ photo_panel <- htmltools::HTML('
 dashboard <- bscols(
   widths = c(2, 10), 
   list(
+    filter_select(id = "survey_search", label = "Search Site (Year - ID):", sharedData = shared_data, group = ~Search_Key),
     filter_select(id = "region_filter", label = "Select Region:", sharedData = shared_data, group = ~Region),
     filter_checkbox(id = "year_filter", label = "Select Year(s):", sharedData = shared_data, group = ~Year, inline = FALSE),
     filter_select(id = "habitat_filter", label = "Select Habitat:", sharedData = shared_data, group = ~Habitat),

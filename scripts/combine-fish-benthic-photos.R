@@ -61,6 +61,11 @@ for (site in site_ids) {
 
     files <- list.files(src, full.names = TRUE)
 
+    # --- NEW FILTERING LOGIC ---
+    # Exclude files that start with a dot (e.g., .DS_Store) OR end with .ini (e.g., desktop.ini)
+    files <- files[!grepl("^\\.|\\.ini$", basename(files), ignore.case = TRUE)]
+    # ---------------------------
+
     if (length(files) > 0) {
       for (f in files) {
         # Add the folder suffix prefix to the filename (e.g., "fish_survey_IMG123.jpg")
@@ -72,7 +77,7 @@ for (site in site_ids) {
       }
     }
 
-    # D. Delete the old folder now that it is empty
+    # D. Delete the old folder now that it is empty (this also deletes the leftover junk files)
     unlink(src, recursive = TRUE)
   }
 

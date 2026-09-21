@@ -104,7 +104,9 @@ data <- data %>%
     Expected_Prefix = paste(Year, CleanRegion, SurveyID, sep = "/"),
 
     # C. Check if that exact prefix exists in our pulled bucket list
-    Has_Photos = ifelse(Expected_Prefix %in% bucket_folders, "Yes", "No")
+    Has_Photos = ifelse(Expected_Prefix %in% bucket_folders, "Yes", "No"),
+    # D. Round depth value
+    Depth = round(Depth, digits = 1)
   ) %>%
   # Clean up the temporary columns so they don't get saved into the CSV
   select(-CleanRegion, -Expected_Prefix)
@@ -115,5 +117,6 @@ cat("Matched exact Year/Region/SurveyID folders for", matched_count, "out of", n
 
 # 6. Save the updated CSV (overwriting the original)
 write_csv(data, csv_path)
+write_parquet(data, "data/survey_data.parquet")
 cat("Successfully updated and saved:", csv_path, "\n")
 cat("Your map dashboard will now accurately filter by 'Has Photos'!\n")

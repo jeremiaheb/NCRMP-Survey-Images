@@ -17,6 +17,8 @@ library(dplyr)
 library(crosstalk)
 library(htmlwidgets)
 library(arrow)
+library(sf)
+library(rmapshaper)
 ```
 
 ::: {.column-screen style="padding: 0 20px;"}
@@ -27,6 +29,18 @@ data_path <- "../data/survey_data.parquet"
 if (!file.exists(data_path)) {
   stop(paste("File not found at:", data_path, "\nPlease check your directory path."))
 }
+
+# 1. Load and project the shapefile
+management_shapefile <- st_read("../shapefiles/ncrmp_mgmt.shp", quiet = TRUE) %>%
+  st_transform(4326) %>% 
+  ms_simplify(keep = 0.05, keep_shapes = TRUE)
+
+# 2. Create a categorical color palette mapped to the 'management' column
+# 'Set2' is a visually distinct color palette built into R, but you can pass specific hex codes if preferred.
+mgmt_palette <- colorFactor(
+  palette = "Set2", 
+  domain = management_shapefile$management
+)
 
 # Load the CSV
 data <- read_parquet(data_path)
@@ -87,6 +101,17 @@ shared_data <- SharedData$new(data)
 map <- leaflet(shared_data, width = "100%", height = "60vh") %>%
   addProviderTiles(providers$Esri.OceanBasemap, group = "Ocean Basemap") %>%
   addProviderTiles(providers$Esri.WorldTopoMap, group = "World Topo") %>%
+  addPolygons(
+    data = management_shapefile,
+    fillColor = ~mgmt_palette(management), # Apply the color palette
+    color = "#ffffff",                     # Outline color (white borders look clean)
+    weight = 1,                            # Outline thickness
+    fillOpacity = 0.5,                     # Transparency
+    group = "Management Areas",
+    
+    # Optional: Add a simple popup so users know what area they clicked
+    popup = ~paste("<strong style='font-family: sans-serif;'>Area:</strong>", management)
+  ) %>%
   addCircleMarkers(
     lng = ~Lon, 
     lat = ~Lat,

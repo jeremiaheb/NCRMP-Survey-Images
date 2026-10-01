@@ -210,6 +210,37 @@ onRender("
       
       // Trigger it once on initial load just in case the default zoom is already close
       map.fire('zoomend');
+      
+// 3. NEW: Custom Coordinate Plotting Logic
+      var plotBtn = document.getElementById('plot-btn');
+      var userMarker = null; // Store the marker so we can move it if they plot again
+      
+      if (plotBtn) {
+        plotBtn.addEventListener('click', function() {
+          var lat = parseFloat(document.getElementById('user-lat').value);
+          var lon = parseFloat(document.getElementById('user-lon').value);
+          
+          // Validate input
+          if (isNaN(lat) || isNaN(lon)) {
+            alert('Please enter valid numeric coordinates.');
+            return;
+          }
+          
+          // Remove the old marker if they already plotted one
+          if (userMarker !== null) {
+            map.removeLayer(userMarker);
+          }
+          
+          // Create a new distinct marker (using default red icon or just standard pin)
+          userMarker = L.marker([lat, lon]).addTo(map);
+          
+          // Add a popup and open it
+          userMarker.bindPopup('<b>Custom Location</b><br>Lat: ' + lat + '<br>Lon: ' + lon).openPopup();
+          
+          // Smoothly pan and zoom to the new coordinate
+          map.flyTo([lat, lon], 14);
+        });
+      }
     }
   ")
 
@@ -266,9 +297,21 @@ photo_panel <- htmltools::HTML('
   </script>
 ')
 
+coord_input_ui <- htmltools::HTML('
+  <div style="margin-bottom: 15px; padding: 15px; background: #ffffff; border-radius: 8px; border: 1px solid #dee2e6; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+    <h4 style="margin-top: 0; font-family: sans-serif; font-size: 14px; color: #495057;">Plot Custom Location</h4>
+    <div style="display: flex; gap: 10px; align-items: center;">
+      <input type="number" id="user-lat" placeholder="Latitude (e.g. 18.33)" step="any" style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 4px;">
+      <input type="number" id="user-lon" placeholder="Longitude (e.g. -64.91)" step="any" style="width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 4px;">
+      <button id="plot-btn" style="padding: 6px 12px; background: #0073FF; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">Plot</button>
+    </div>
+  </div>
+')
+
 dashboard <- bscols(
   widths = c(2, 10), 
   list(
+    coord_input_ui,
     filter_select(id = "survey_search", label = "Search Site (Year - ID):", sharedData = shared_data, group = ~Search_Key),
     filter_select(id = "region_filter", label = "Select Region:", sharedData = shared_data, group = ~Region),
     filter_checkbox(id = "year_filter", label = "Select Year(s):", sharedData = shared_data, group = ~Year, inline = FALSE),

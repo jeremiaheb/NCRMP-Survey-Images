@@ -6,11 +6,14 @@ project_id <- "ggn-nmfs-sencrmp-prod-1"
 location <- "us"
 model_id <- "gemini-3.5-flash"
 
+# Turn on maximum debugging
+options(gargle_verbosity = "debug")
+
 # 2. Authenticate
 # Point this to your NOAA service account JSON key
 token <- credentials_service_account(
   scopes = "https://www.googleapis.com/auth/cloud-platform",
-  path = "D:/Personal/NOAA/ggn-nmfs-sencrmp-prod-1-7bc592943e42.json"
+  path = "D:/Personal/NOAA/ggn-nmfs-sencrmp-prod-1-f5f5f1f6f943.json"
 )
 
 # 3. Build the Endpoint URL (Fixed for multi-region)
